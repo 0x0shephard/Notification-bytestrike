@@ -65,7 +65,6 @@ const MARKETS = [
     name: 'H100-PERP',
     displayName: 'H100 GPU',
     vammAddress: CONFIG.contracts.vammProxy,
-    tableName: 'price_data',
     active: true,
   },
   {
@@ -73,7 +72,6 @@ const MARKETS = [
     name: 'H100-HyperScalers-PERP',
     displayName: 'H100 HyperScalers',
     vammAddress: '0xFE1df531084Dcf0Fe379854823bC5d402932Af99',
-    tableName: 'h100_hyperscalers_perp_prices',
     active: true,
   },
   {
@@ -81,7 +79,6 @@ const MARKETS = [
     name: 'H100-non-HyperScalers-PERP',
     displayName: 'H100 non-HyperScalers',
     vammAddress: '0x19574B8C91717389231DA5b0579564d6F81a79B0',
-    tableName: 'h100_non_hyperscalers_perp_prices',
     active: true,
   },
   {
@@ -89,8 +86,6 @@ const MARKETS = [
     name: 'B200-PERP',
     displayName: 'B200 GPU',
     vammAddress: '0xaE8F8a5BE8eFdaa18e7135F7e467a8965d7209e1',
-    tableName: 'b200_index_prices',
-    priceColumn: 'index_price',
     active: true,
   },
   {
@@ -98,8 +93,6 @@ const MARKETS = [
     name: 'H200-PERP',
     displayName: 'H200 GPU',
     vammAddress: '0x58dE5e38F6F927a59166B65a4D8beb425180b5E1',
-    tableName: 'h200_index_prices',
-    priceColumn: 'index_price',
     active: true,
   },
   {
@@ -107,9 +100,6 @@ const MARKETS = [
     name: 'ORACLE-B200-PERP',
     displayName: 'Oracle B200',
     vammAddress: '0xB4D0f5be6ebd543354C7Ca7c5e4dD4DB4E094487',
-    tableName: 'b200_provider_prices',
-    priceColumn: 'effective_price',
-    providerName: 'Oracle',
     active: true,
   },
   {
@@ -117,9 +107,6 @@ const MARKETS = [
     name: 'AWS-B200-PERP',
     displayName: 'AWS B200',
     vammAddress: '0x74171136e671916c58F413eC085ED1561c8EeE9B',
-    tableName: 'b200_provider_prices',
-    priceColumn: 'effective_price',
-    providerName: 'AWS',
     active: true,
   },
   {
@@ -127,9 +114,6 @@ const MARKETS = [
     name: 'COREWEAVE-B200-PERP',
     displayName: 'CoreWeave B200',
     vammAddress: '0x377eA108a74466815b91943A0E924c10fe65Bc7D',
-    tableName: 'b200_provider_prices',
-    priceColumn: 'effective_price',
-    providerName: 'CoreWeave',
     active: true,
   },
   {
@@ -137,9 +121,6 @@ const MARKETS = [
     name: 'GCP-B200-PERP',
     displayName: 'GCP B200',
     vammAddress: '0xb0e3d0F571d8F9a8FDDd477A0A09e1A232Ce7eC1',
-    tableName: 'b200_provider_prices',
-    priceColumn: 'effective_price',
-    providerName: 'Google Cloud',
     active: true,
   },
   {
@@ -147,9 +128,6 @@ const MARKETS = [
     name: 'ORACLE-H200-PERP',
     displayName: 'Oracle H200',
     vammAddress: '0x4bBA5dc77E1968681421F494048884b5933aF3c0',
-    tableName: 'h200_provider_prices',
-    priceColumn: 'effective_price',
-    providerName: 'Oracle',
     active: true,
   },
   {
@@ -157,9 +135,6 @@ const MARKETS = [
     name: 'AWS-H200-PERP',
     displayName: 'AWS H200',
     vammAddress: '0x34C0673fA279CE7b7Ca964f7E6e6904efc3eBC56',
-    tableName: 'h200_provider_prices',
-    priceColumn: 'effective_price',
-    providerName: 'AWS',
     active: true,
   },
   {
@@ -167,9 +142,6 @@ const MARKETS = [
     name: 'COREWEAVE-H200-PERP',
     displayName: 'CoreWeave H200',
     vammAddress: '0xc4BfB9f43aBFadbdD31b7CDa8fc7479b688b1452',
-    tableName: 'h200_provider_prices',
-    priceColumn: 'effective_price',
-    providerName: 'CoreWeave',
     active: true,
   },
   {
@@ -177,9 +149,6 @@ const MARKETS = [
     name: 'GCP-H200-PERP',
     displayName: 'GCP H200',
     vammAddress: '0xb6e84d44C984564014dd2Ae4B8A9a3D32694AF02',
-    tableName: 'h200_provider_prices',
-    priceColumn: 'effective_price',
-    providerName: 'Google Cloud',
     active: true,
   },
   {
@@ -187,9 +156,6 @@ const MARKETS = [
     name: 'AZURE-H200-PERP',
     displayName: 'Azure H200',
     vammAddress: '0xEA15809884A8f2281017E7047d7d123268529FA2',
-    tableName: 'h200_provider_prices',
-    priceColumn: 'effective_price',
-    providerName: 'Azure',
     active: true,
   },
   {
@@ -197,9 +163,6 @@ const MARKETS = [
     name: 'AWS-H100-PERP',
     displayName: 'AWS H100',
     vammAddress: '0x248480c4433CEFfBDE0CdE75189fc616469B9ec4',
-    tableName: 'h100_hyperscaler_prices',
-    priceColumn: 'effective_price',
-    providerName: 'Amazon Web Services',
     active: true,
   },
   {
@@ -207,9 +170,6 @@ const MARKETS = [
     name: 'AZURE-H100-PERP',
     displayName: 'Azure H100',
     vammAddress: '0xea44aB243a73ba7b3051F3624F4545F00C4DA167',
-    tableName: 'h100_hyperscaler_prices',
-    priceColumn: 'effective_price',
-    providerName: 'Microsoft Azure',
     active: true,
   },
   {
@@ -217,9 +177,6 @@ const MARKETS = [
     name: 'GCP-H100-PERP',
     displayName: 'GCP H100',
     vammAddress: '0xA7dB000966387C09e6A4ad2c89264bD65241398b',
-    tableName: 'h100_hyperscaler_prices',
-    priceColumn: 'effective_price',
-    providerName: 'Google Cloud',
     active: true,
   },
   {
@@ -234,8 +191,6 @@ const MARKETS = [
     name: 'T4-PERP',
     displayName: 'T4 GPU',
     vammAddress: '0x910C730dBEd5384fbF83bf1F387609bf83E8ffDd',
-    tableName: 't4_index_prices',
-    priceColumn: 'index_price', // column name differs from the default 'price'
     active: true,
   },
   {
@@ -243,8 +198,6 @@ const MARKETS = [
     name: 'ETH-PERP-V2',
     displayName: 'H100 GPU',
     vammAddress: CONFIG.contracts.vammProxy,
-    // Alias to H100-PERP data
-    tableName: 'price_data',
     active: true,
   },
   {
@@ -692,30 +645,10 @@ async function storePriceSnapshot(market, markPrice, oraclePrice, blockNumber) {
     console.error('Error storing price snapshot:', error.message);
   }
 
-  // 2. Write to market-specific table if configured (for PriceIndexChart - ORACLE PRICES)
-  if (market.tableName) {
-    // Skip aliases from writing to the same table twice in the same loop run
-    if (market.name !== 'ETH-PERP-V2') {
-        const priceCol = market.priceColumn || 'price';
-        const row = {
-            [priceCol]: oraclePrice, // IMPORTANT: These tables are for INDEX/ORACLE prices, not vAMM mark prices
-            timestamp: timestamp,
-        };
-        if (market.providerName) row.provider_name = market.providerName;
-
-        const { error: specificError } = await supabase
-        .from(market.tableName)
-        .insert(row);
-
-        if (specificError) {
-             console.error(`Error storing to ${market.tableName}:`, specificError.message);
-        } else {
-            console.log(`[SNAPSHOT] ${market.name} -> ${market.tableName}: $${oraclePrice.toFixed(2)}`);
-        }
-    }
-  }
-
-  // 3. Write to vamm_price_history (unified table for AdvancedChart)
+  // 2. Write to vamm_price_history (unified table for AdvancedChart).
+  // Do not write to index/provider price tables here. Those tables are owned by
+  // the pricing pipeline; writing the single fallback oracle price from this
+  // service would make every index chart collapse to the same value.
   const { error: vammError } = await supabase
     .from('vamm_price_history')
     .insert({
