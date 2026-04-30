@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createPublicClient, http, parseAbiItem, formatUnits } from 'viem';
 import { sepolia } from 'viem/chains';
 import * as dotenv from 'dotenv';
+import { createServer } from 'node:http';
 
 // Load environment variables
 dotenv.config();
@@ -40,6 +41,9 @@ const CONFIG = {
   snapshotInterval: parseInt(process.env.SNAPSHOT_INTERVAL) || 60000, // 1 minute
   statsInterval:    parseInt(process.env.STATS_INTERVAL)    || 300000, // 5 minutes
   indexHistorical:  process.env.INDEX_HISTORICAL !== 'false',
+  startBlock:       BigInt(process.env.START_BLOCK || '5000000'),
+  port:             parseInt(process.env.PORT || '3000', 10),
+  corsOrigin:       process.env.CORS_ORIGIN || '*',
 
   // Notification dedup suppression windows (ms)
   dedup: {
@@ -81,11 +85,157 @@ const MARKETS = [
     active: true,
   },
   {
+    id: '0xb4be6bdaf765a9dc45759a99c834b32d12825dce59bc28052946c1f1267a999b', // B200-PERP
+    name: 'B200-PERP',
+    displayName: 'B200 GPU',
+    vammAddress: '0xaE8F8a5BE8eFdaa18e7135F7e467a8965d7209e1',
+    tableName: 'b200_index_prices',
+    priceColumn: 'index_price',
+    active: true,
+  },
+  {
+    id: '0x3b9736717eab3427f776c56345a626690c13be77aa87cb6858bf92d50ad0c998', // H200-PERP
+    name: 'H200-PERP',
+    displayName: 'H200 GPU',
+    vammAddress: '0x58dE5e38F6F927a59166B65a4D8beb425180b5E1',
+    tableName: 'h200_index_prices',
+    priceColumn: 'index_price',
+    active: true,
+  },
+  {
+    id: '0x78b1dd5626222aef5d91e323da7cbe8941adb4eaaf0d1e90ac2dcee2680be01f',
+    name: 'ORACLE-B200-PERP',
+    displayName: 'Oracle B200',
+    vammAddress: '0xB4D0f5be6ebd543354C7Ca7c5e4dD4DB4E094487',
+    tableName: 'b200_provider_prices',
+    priceColumn: 'effective_price',
+    providerName: 'Oracle',
+    active: true,
+  },
+  {
+    id: '0x7e0ed16d08b6e36ae874386fd9c02a530e31026876a299a5ac59e9a8a7859c8e',
+    name: 'AWS-B200-PERP',
+    displayName: 'AWS B200',
+    vammAddress: '0x74171136e671916c58F413eC085ED1561c8EeE9B',
+    tableName: 'b200_provider_prices',
+    priceColumn: 'effective_price',
+    providerName: 'AWS',
+    active: true,
+  },
+  {
+    id: '0x05b98a16e85afdd21369f8dde4ae197e2b445f37445b0e382ebcfdd10b711306',
+    name: 'COREWEAVE-B200-PERP',
+    displayName: 'CoreWeave B200',
+    vammAddress: '0x377eA108a74466815b91943A0E924c10fe65Bc7D',
+    tableName: 'b200_provider_prices',
+    priceColumn: 'effective_price',
+    providerName: 'CoreWeave',
+    active: true,
+  },
+  {
+    id: '0xd0394d4ba76fe79cd0b954eb8e205df0cc4f08fb654dc916f5728d31c19f9305',
+    name: 'GCP-B200-PERP',
+    displayName: 'GCP B200',
+    vammAddress: '0xb0e3d0F571d8F9a8FDDd477A0A09e1A232Ce7eC1',
+    tableName: 'b200_provider_prices',
+    priceColumn: 'effective_price',
+    providerName: 'Google Cloud',
+    active: true,
+  },
+  {
+    id: '0x61f05fafb6842941c9a7d6839378de32d97a2de181b4db0e276b8d2093b61866',
+    name: 'ORACLE-H200-PERP',
+    displayName: 'Oracle H200',
+    vammAddress: '0x4bBA5dc77E1968681421F494048884b5933aF3c0',
+    tableName: 'h200_provider_prices',
+    priceColumn: 'effective_price',
+    providerName: 'Oracle',
+    active: true,
+  },
+  {
+    id: '0x12aa394c59dbf446e7ba1d3ab66f4629761c27d0dbacf484da0f4b205260c8fc',
+    name: 'AWS-H200-PERP',
+    displayName: 'AWS H200',
+    vammAddress: '0x34C0673fA279CE7b7Ca964f7E6e6904efc3eBC56',
+    tableName: 'h200_provider_prices',
+    priceColumn: 'effective_price',
+    providerName: 'AWS',
+    active: true,
+  },
+  {
+    id: '0xf8444beb26f5f34e8d5ec6c988b1023100cd68287fa48066b54e428188ffa447',
+    name: 'COREWEAVE-H200-PERP',
+    displayName: 'CoreWeave H200',
+    vammAddress: '0xc4BfB9f43aBFadbdD31b7CDa8fc7479b688b1452',
+    tableName: 'h200_provider_prices',
+    priceColumn: 'effective_price',
+    providerName: 'CoreWeave',
+    active: true,
+  },
+  {
+    id: '0xb654d9eedc69b55e0fe883d03cae37d13fdacc319a5a1f507bb33875e0e14201',
+    name: 'GCP-H200-PERP',
+    displayName: 'GCP H200',
+    vammAddress: '0xb6e84d44C984564014dd2Ae4B8A9a3D32694AF02',
+    tableName: 'h200_provider_prices',
+    priceColumn: 'effective_price',
+    providerName: 'Google Cloud',
+    active: true,
+  },
+  {
+    id: '0xc845b4b5cdd753d1ad772bc105e5c4ddddff19c3da674c69da5c9f1a810bb872',
+    name: 'AZURE-H200-PERP',
+    displayName: 'Azure H200',
+    vammAddress: '0xEA15809884A8f2281017E7047d7d123268529FA2',
+    tableName: 'h200_provider_prices',
+    priceColumn: 'effective_price',
+    providerName: 'Azure',
+    active: true,
+  },
+  {
+    id: '0x69df00e859e1b007896c59653bb3ca35622fdf2bf46c2fd9fea7ffa7d88b6378',
+    name: 'AWS-H100-PERP',
+    displayName: 'AWS H100',
+    vammAddress: '0x248480c4433CEFfBDE0CdE75189fc616469B9ec4',
+    tableName: 'h100_hyperscaler_prices',
+    priceColumn: 'effective_price',
+    providerName: 'Amazon Web Services',
+    active: true,
+  },
+  {
+    id: '0x2492e86fcfe9b174434dfca2c27205159a34cf4e90f0ec7a1605fae91a7e7bbd',
+    name: 'AZURE-H100-PERP',
+    displayName: 'Azure H100',
+    vammAddress: '0xea44aB243a73ba7b3051F3624F4545F00C4DA167',
+    tableName: 'h100_hyperscaler_prices',
+    priceColumn: 'effective_price',
+    providerName: 'Microsoft Azure',
+    active: true,
+  },
+  {
+    id: '0x8c78c8c17cc7712fe1b17592a2c0a7f814f8ec784de0fbb4ae6573e3457e11dd',
+    name: 'GCP-H100-PERP',
+    displayName: 'GCP H100',
+    vammAddress: '0xA7dB000966387C09e6A4ad2c89264bD65241398b',
+    tableName: 'h100_hyperscaler_prices',
+    priceColumn: 'effective_price',
+    providerName: 'Google Cloud',
+    active: true,
+  },
+  {
+    id: '0x7c611d543b87d4eecced3a16f8db373340d784390882ad3e2fd76f257a51cf55',
+    name: 'A100-PERP',
+    displayName: 'A100 GPU',
+    vammAddress: '0xAeb28c8BB78149E2B7FA2419728Cd1E6e0Ed5842',
+    active: true,
+  },
+  {
     id: '0xb1bae2ea6c465ce4acb7d8a4a16a8899c9cc94ac35b5a82403875c6b2aa34f3e', // T4-PERP
     name: 'T4-PERP',
     displayName: 'T4 GPU',
     vammAddress: '0x910C730dBEd5384fbF83bf1F387609bf83E8ffDd',
     tableName: 't4_index_prices',
+    priceColumn: 'index_price', // column name differs from the default 'price'
     active: true,
   },
   {
@@ -231,7 +381,7 @@ function initializeClients() {
     transport: http(CONFIG.rpcUrl),
   });
 
-  console.log('✅ Clients initialized');
+  console.log('[OK] Clients initialized');
 }
 
 // ==================== BLOCKCHAIN FUNCTIONS ====================
@@ -262,6 +412,72 @@ async function getOraclePrice() {
     console.error('Error fetching oracle price:', error.message);
     return null;
   }
+}
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': CONFIG.corsOrigin,
+    'Access-Control-Allow-Methods': 'GET,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Cache-Control': 'no-store',
+  });
+  res.end(JSON.stringify(payload));
+}
+
+async function getCachedMarketStats() {
+  const { data, error } = await supabase
+    .from('market_stats_24h')
+    .select('*')
+    .order('market_name', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
+
+function startHttpServer() {
+  const startedAt = new Date().toISOString();
+
+  const server = createServer(async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      sendJson(res, 204, {});
+      return;
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+
+    try {
+      if (url.pathname === '/health') {
+        sendJson(res, 200, {
+          ok: true,
+          service: 'bytestrike-notification-indexer',
+          startedAt,
+          activeMarkets: MARKETS.filter((market) => market.active).length,
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/markets/stats') {
+        const stats = await getCachedMarketStats();
+        sendJson(res, 200, { data: stats, updatedAt: new Date().toISOString() });
+        return;
+      }
+
+      sendJson(res, 404, { error: 'Not found' });
+    } catch (error) {
+      console.error('HTTP error:', error.message);
+      sendJson(res, 500, { error: error.message });
+    }
+  });
+
+  server.listen(CONFIG.port, () => {
+    console.log(`[HTTP] HTTP server listening on :${CONFIG.port} (/health, /api/markets/stats)`);
+  });
+
+  return server;
 }
 
 // ==================== NOTIFICATION ENGINE ====================
@@ -412,7 +628,7 @@ const NOTIFICATION_DEFS = {
 async function createTraderNotification(code, userAddress, marketId, payload, txHash = null) {
   const def = NOTIFICATION_DEFS[code];
   if (!def) {
-    console.warn(`⚠️  No definition for notification code: ${code}`);
+    console.warn(`[WARN] No definition for notification code: ${code}`);
     return;
   }
 
@@ -422,7 +638,7 @@ async function createTraderNotification(code, userAddress, marketId, payload, tx
 
   // Suppression check
   if (await isDuped(userLower, marketIdLow, code)) {
-    console.log(`🔕 Suppressed ${code} for ${userLower.slice(0,8)}... (dedup window active)`);
+    console.log(`[DEDUP] Suppressed ${code} for ${userLower.slice(0,8)}... (dedup window active)`);
     return;
   }
 
@@ -446,12 +662,12 @@ async function createTraderNotification(code, userAddress, marketId, payload, tx
     });
 
   if (error) {
-    console.error(`❌ Failed to insert notification ${code}:`, error.message);
+    console.error(`[ERROR] Failed to insert notification ${code}:`, error.message);
     return;
   }
 
   await updateDedup(userLower, marketIdLow, code);
-  console.log(`🔔 [${code}] ${def.priority.toUpperCase()} → ${userLower.slice(0,10)}... | ${label}`);
+  console.log(`[NOTIFY] [${code}] ${def.priority.toUpperCase()} → ${userLower.slice(0,10)}... | ${label}`);
 }
 
 // ==================== DATABASE FUNCTIONS ====================
@@ -480,17 +696,21 @@ async function storePriceSnapshot(market, markPrice, oraclePrice, blockNumber) {
   if (market.tableName) {
     // Skip aliases from writing to the same table twice in the same loop run
     if (market.name !== 'ETH-PERP-V2') {
+        const priceCol = market.priceColumn || 'price';
+        const row = {
+            [priceCol]: oraclePrice, // IMPORTANT: These tables are for INDEX/ORACLE prices, not vAMM mark prices
+            timestamp: timestamp,
+        };
+        if (market.providerName) row.provider_name = market.providerName;
+
         const { error: specificError } = await supabase
         .from(market.tableName)
-        .insert({
-            price: oraclePrice, // IMPORTANT: These tables are for INDEX/ORACLE prices, not vAMM mark prices
-            timestamp: timestamp,
-        });
+        .insert(row);
 
         if (specificError) {
              console.error(`Error storing to ${market.tableName}:`, specificError.message);
         } else {
-            console.log(`📸 ${market.name} -> ${market.tableName}: $${oraclePrice.toFixed(2)}`);
+            console.log(`[SNAPSHOT] ${market.name} -> ${market.tableName}: $${oraclePrice.toFixed(2)}`);
         }
     }
   }
@@ -508,7 +728,7 @@ async function storePriceSnapshot(market, markPrice, oraclePrice, blockNumber) {
   if (vammError) {
     console.error(`Error storing to vamm_price_history:`, vammError.message);
   } else {
-    console.log(`📊 ${market.name} -> vamm_price_history: $${markPrice.toFixed(2)}`);
+    console.log(`[STATS] ${market.name} -> vamm_price_history: $${markPrice.toFixed(2)}`);
   }
 
   return true;
@@ -553,7 +773,7 @@ async function indexSwapEvent(event, market) {
     return false;
   }
 
-  console.log(`💱 ${market.name}: ${isLong ? 'LONG' : 'SHORT'} $${notionalUsd.toFixed(2)} @ $${avgPrice.toFixed(2)}`);
+  console.log(`[SWAP] ${market.name}: ${isLong ? 'LONG' : 'SHORT'} $${notionalUsd.toFixed(2)} @ $${avgPrice.toFixed(2)}`);
   return true;
 }
 
@@ -575,44 +795,97 @@ async function getLastIndexedBlock(vammAddress) {
 
 async function updateMarketStats(market) {
   try {
-    // Call PostgreSQL function to calculate stats
-    const { data, error } = await supabase
-      .rpc('calculate_market_stats_24h', { p_market_id: market.id });
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const marketId = market.id.toLowerCase();
 
-    if (error) {
-      console.error('Error calculating stats:', error.message);
+    const [
+      currentResult,
+      previousResult,
+      rangeResult,
+      swapsResult,
+    ] = await Promise.all([
+      supabase
+        .from('price_snapshots')
+        .select('mark_price,timestamp')
+        .eq('market_id', marketId)
+        .order('timestamp', { ascending: false })
+        .limit(1),
+      supabase
+        .from('price_snapshots')
+        .select('mark_price,timestamp')
+        .eq('market_id', marketId)
+        .lte('timestamp', cutoff)
+        .order('timestamp', { ascending: false })
+        .limit(1),
+      supabase
+        .from('price_snapshots')
+        .select('mark_price')
+        .eq('market_id', marketId)
+        .gte('timestamp', cutoff)
+        .limit(2000),
+      supabase
+        .from('swap_events')
+        .select('notional_usd')
+        .eq('market_id', marketId)
+        .gte('timestamp', cutoff)
+        .limit(10000),
+    ]);
+
+    for (const result of [currentResult, previousResult, rangeResult, swapsResult]) {
+      if (result.error) {
+        console.error(`Error calculating stats for ${market.name}:`, result.error.message);
+        return;
+      }
+    }
+
+    const currentPrice = currentResult.data?.[0]?.mark_price ?? null;
+    const price24hAgo = previousResult.data?.[0]?.mark_price ?? currentPrice;
+
+    if (currentPrice == null) {
+      console.warn(`No price snapshots available for ${market.name}; skipping stats update`);
       return;
     }
 
-    if (data && data.length > 0) {
-      const stats = data[0];
+    const prices24h = (rangeResult.data || [])
+      .map((row) => Number(row.mark_price))
+      .filter((price) => Number.isFinite(price));
+    const volume24h = (swapsResult.data || []).reduce((sum, row) => {
+      const notional = Number(row.notional_usd || 0);
+      return Number.isFinite(notional) ? sum + Math.abs(notional) : sum;
+    }, 0);
+    const previousPrice = Number(price24hAgo || currentPrice);
+    const change24h = previousPrice > 0
+      ? ((Number(currentPrice) - previousPrice) / previousPrice) * 100
+      : 0;
+    const high24h = prices24h.length > 0 ? Math.max(...prices24h) : Number(currentPrice);
+    const low24h = prices24h.length > 0 ? Math.min(...prices24h) : Number(currentPrice);
 
-      // Upsert into cached stats table
-      const { error: upsertError } = await supabase
-        .from('market_stats_24h')
-        .upsert({
-          market_id: market.id,
-          market_name: market.name,
-          vamm_address: market.vammAddress.toLowerCase(),
-          current_price: stats.current_price,
-          price_24h_ago: stats.price_24h_ago,
-          change_24h_percent: stats.change_24h_percent,
-          volume_24h_usd: stats.volume_24h_usd,
-          trades_24h: stats.trades_24h,
-          high_24h: stats.high_24h,
-          low_24h: stats.low_24h,
-          last_updated: new Date().toISOString(),
-        }, {
-          onConflict: 'market_id',
-        });
+    const { error: upsertError } = await supabase
+      .from('market_stats_24h')
+      .upsert({
+        market_id: marketId,
+        market_name: market.name,
+        vamm_address: market.vammAddress.toLowerCase(),
+        current_price: currentPrice,
+        price_24h_ago: price24hAgo,
+        change_24h_percent: change24h,
+        volume_24h_usd: volume24h,
+        trades_24h: swapsResult.data?.length || 0,
+        high_24h: high24h,
+        low_24h: low24h,
+        open_interest_usd: 0,
+        last_updated: now.toISOString(),
+      }, {
+        onConflict: 'market_id',
+      });
 
-      if (upsertError) {
-        console.error('Error upserting stats:', upsertError.message);
-        return;
-      }
-
-      console.log(`📊 ${market.name}: $${parseFloat(stats.volume_24h_usd || 0).toFixed(2)} volume, ${parseFloat(stats.change_24h_percent || 0).toFixed(2)}% change`);
+    if (upsertError) {
+      console.error('Error upserting stats:', upsertError.message);
+      return;
     }
+
+    console.log(`[STATS] ${market.name}: $${volume24h.toFixed(2)} volume, ${change24h.toFixed(2)}% change`);
   } catch (error) {
     console.error('Error updating market stats:', error.message);
   }
@@ -621,7 +894,7 @@ async function updateMarketStats(market) {
 // ==================== INDEXER FUNCTIONS ====================
 
 async function indexHistoricalEvents(market) {
-  console.log(`📜 Indexing historical events for ${market.name}...`);
+  console.log(`[HISTORY] Indexing historical events for ${market.name}...`);
 
   try {
     // Get last indexed block or start from beginning
@@ -630,7 +903,7 @@ async function indexHistoricalEvents(market) {
       fromBlock = fromBlock + 1n;
       console.log(`   Resuming from block ${fromBlock}`);
     } else {
-      fromBlock = 5000000n; // Sepolia block where contracts were deployed
+      fromBlock = CONFIG.startBlock;
       console.log(`   Starting from block ${fromBlock}`);
     }
 
@@ -662,7 +935,7 @@ async function indexHistoricalEvents(market) {
       }
     }
 
-    console.log(`✅ Indexed ${indexed} historical events for ${market.name}`);
+    console.log(`[OK] Indexed ${indexed} historical events for ${market.name}`);
     return indexed;
   } catch (error) {
     console.error(`Error indexing historical events for ${market.name}:`, error.message);
@@ -671,7 +944,7 @@ async function indexHistoricalEvents(market) {
 }
 
 function startEventWatcher(market) {
-  console.log(`👀 Watching ${market.name} for new swaps...`);
+  console.log(`[WATCH] Watching ${market.name} for new swaps...`);
 
   const unwatch = publicClient.watchEvent({
     address: market.vammAddress,
@@ -785,7 +1058,7 @@ function startClearingHouseWatchers() {
             .order('block_number', { ascending: false });
 
           const uniqueTraders = [...new Set((traders || []).map(r => r.trader_address))];
-          console.log(`📢 Market ${isPaused ? 'paused' : 'resumed'}: notifying ${uniqueTraders.length} traders`);
+          console.log(`[MARKET] Market ${isPaused ? 'paused' : 'resumed'}: notifying ${uniqueTraders.length} traders`);
 
           for (const trader of uniqueTraders) {
             await createTraderNotification(code, trader, marketLow, {}, log.transactionHash);
@@ -837,7 +1110,7 @@ function startClearingHouseWatchers() {
     })
   );
 
-  console.log('✅ ClearingHouse event watchers started (LiquidationExecuted, FundingSettled, MarketPaused, collateralDeposited, collateralWithdrawn)');
+  console.log('[OK] ClearingHouse event watchers started (LiquidationExecuted, FundingSettled, MarketPaused, collateralDeposited, collateralWithdrawn)');
   return unwatches;
 }
 
@@ -856,7 +1129,7 @@ async function snapshotPrice(market) {
 async function main() {
   console.log('');
   console.log('═══════════════════════════════════════════════════');
-  console.log('  🚀 ByteStrike Event Indexer');
+  console.log('   ByteStrike Event Indexer');
   console.log('═══════════════════════════════════════════════════');
   console.log('');
 
@@ -864,13 +1137,13 @@ async function main() {
   try {
     initializeClients();
   } catch (error) {
-    console.error('❌ Initialization failed:', error.message);
+    console.error(' Initialization failed:', error.message);
     process.exit(1);
   }
 
-  console.log(`📍 Network: Sepolia (Chain ID: ${CONFIG.chainId})`);
-  console.log(`🔗 RPC: ${CONFIG.rpcUrl}`);
-  console.log(`💾 Database: ${CONFIG.supabaseUrl}`);
+  console.log(`Network: Sepolia (Chain ID: ${CONFIG.chainId})`);
+  console.log(`RPC: ${CONFIG.rpcUrl}`);
+  console.log(`Database: ${CONFIG.supabaseUrl}`);
   console.log('');
   console.log('Settings:');
   console.log(`  • Price snapshots: Every ${CONFIG.snapshotInterval / 1000}s`);
@@ -881,11 +1154,12 @@ async function main() {
   console.log('');
 
   const unwatchFns = [];
+  const httpServer = startHttpServer();
 
   // Process each market
   for (const market of MARKETS) {
     if (!market.active) {
-      console.log(`⏭️  Skipping: ${market.name} (inactive)`);
+      console.log(`Skipping: ${market.name} (inactive)`);
       continue;
     }
 
@@ -911,7 +1185,7 @@ async function main() {
 
   // Set up periodic tasks
   const snapshotTimer = setInterval(async () => {
-    console.log('📸 Taking price snapshots...');
+    console.log('[SNAPSHOT] Taking price snapshots...');
     for (const market of MARKETS) {
       if (market.active) {
         await snapshotPrice(market);
@@ -920,7 +1194,7 @@ async function main() {
   }, CONFIG.snapshotInterval);
 
   const statsTimer = setInterval(async () => {
-    console.log('📊 Updating 24h statistics...');
+    console.log('[STATS] Updating 24h statistics...');
     for (const market of MARKETS) {
       if (market.active) {
         await updateMarketStats(market);
@@ -928,7 +1202,7 @@ async function main() {
     }
   }, CONFIG.statsInterval);
 
-  console.log('✅ Indexer running successfully!');
+  console.log('[OK] Indexer running successfully!');
   console.log('');
   console.log('Press Ctrl+C to stop');
   console.log('═══════════════════════════════════════════════════');
@@ -937,12 +1211,14 @@ async function main() {
   // Graceful shutdown
   const cleanup = () => {
     console.log('');
-    console.log('🛑 Shutting down...');
+    console.log('Shutting down...');
     unwatchFns.forEach(fn => fn());
     clearInterval(snapshotTimer);
     clearInterval(statsTimer);
-    console.log('✅ Stopped gracefully');
-    process.exit(0);
+    httpServer.close(() => {
+      console.log('[OK] Stopped gracefully');
+      process.exit(0);
+    });
   };
 
   process.on('SIGINT', cleanup);
@@ -952,7 +1228,7 @@ async function main() {
 // Start the indexer
 main().catch((error) => {
   console.error('');
-  console.error('❌ Fatal error:', error);
+  console.error('[ERROR] Fatal error:', error);
   console.error('');
   process.exit(1);
 });
