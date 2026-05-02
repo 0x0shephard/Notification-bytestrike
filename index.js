@@ -40,7 +40,9 @@ const CONFIG = {
   // Indexer settings
   snapshotInterval: parseInt(process.env.SNAPSHOT_INTERVAL) || 60000, // 1 minute
   statsInterval:    parseInt(process.env.STATS_INTERVAL)    || 300000, // 5 minutes
-  indexHistorical:  process.env.INDEX_HISTORICAL !== 'false',
+  indexHistorical:  process.env.INDEX_HISTORICAL === 'true',
+  initialSnapshots: process.env.INITIAL_SNAPSHOTS === 'true',
+  rpcDelayMs:       parseInt(process.env.RPC_DELAY_MS || '1000', 10),
   startBlock:       BigInt(process.env.START_BLOCK || '5000000'),
   port:             parseInt(process.env.PORT || '3000', 10),
   corsOrigin:       process.env.CORS_ORIGIN || '*',
@@ -338,6 +340,10 @@ function initializeClients() {
 }
 
 // ==================== BLOCKCHAIN FUNCTIONS ====================
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function getMarkPrice(vammAddress) {
   try {
@@ -883,12 +889,16 @@ function startEventWatcher(market) {
     address: market.vammAddress,
     event: parseAbiItem('event Swap(address indexed sender, int256 baseDelta, int256 quoteDelta, uint256 avgPriceX18)'),
     onLogs: async (logs) => {
-      for (const log of logs) {
-        await indexSwapEvent(log, market);
+      try {
+        for (const log of logs) {
+          await indexSwapEvent(log, market);
+        }
+        // Update stats after new trade
+        await snapshotPrice(market);
+        await updateMarketStats(market);
+      } catch (error) {
+        console.error(`[WATCH] Error handling ${market.name} logs:`, error.message);
       }
-      // Update stats after new trade
-      await snapshotPrice(market);
-      await updateMarketStats(market);
     },
   });
 
@@ -1047,13 +1057,47 @@ function startClearingHouseWatchers() {
   return unwatches;
 }
 
-async function snapshotPrice(market) {
-  const markPrice = await getMarkPrice(market.vammAddress);
-  const oraclePrice = await getOraclePrice();
-  const block = await publicClient.getBlockNumber();
+async function snapshotPrice(market, oraclePrice = null, blockNumber = null) {
+  try {
+    const markPrice = await getMarkPrice(market.vammAddress);
+    const resolvedOraclePrice = oraclePrice ?? await getOraclePrice();
+    const resolvedBlockNumber = blockNumber ?? await publicClient.getBlockNumber();
 
-  if (markPrice) {
-    await storePriceSnapshot(market, markPrice, oraclePrice, Number(block));
+    if (markPrice == null || resolvedOraclePrice == null || resolvedBlockNumber == null) {
+      console.warn(`[SNAPSHOT] Skipping ${market.name}; price or block unavailable`);
+      return false;
+    }
+
+    await storePriceSnapshot(market, markPrice, resolvedOraclePrice, Number(resolvedBlockNumber));
+    return true;
+  } catch (error) {
+    console.error(`[SNAPSHOT] Failed for ${market.name}:`, error.message);
+    return false;
+  }
+}
+
+async function snapshotActiveMarkets() {
+  let oraclePrice;
+  let blockNumber;
+
+  try {
+    oraclePrice = await getOraclePrice();
+    blockNumber = await publicClient.getBlockNumber();
+  } catch (error) {
+    console.error('[SNAPSHOT] Skipping snapshot cycle:', error.message);
+    return;
+  }
+
+  if (oraclePrice == null || blockNumber == null) {
+    console.warn('[SNAPSHOT] Skipping snapshot cycle; oracle price or block unavailable');
+    return;
+  }
+
+  for (const market of MARKETS) {
+    if (market.active) {
+      await snapshotPrice(market, oraclePrice, blockNumber);
+      await sleep(CONFIG.rpcDelayMs);
+    }
   }
 }
 
@@ -1082,6 +1126,8 @@ async function main() {
   console.log(`  • Price snapshots: Every ${CONFIG.snapshotInterval / 1000}s`);
   console.log(`  • Stats updates: Every ${CONFIG.statsInterval / 1000}s`);
   console.log(`  • Historical indexing: ${CONFIG.indexHistorical ? 'ON' : 'OFF'}`);
+  console.log(`  • Initial snapshots: ${CONFIG.initialSnapshots ? 'ON' : 'OFF'}`);
+  console.log(`  • RPC delay: ${CONFIG.rpcDelayMs}ms`);
   console.log('');
   console.log('───────────────────────────────────────────────────');
   console.log('');
@@ -1089,41 +1135,46 @@ async function main() {
   const unwatchFns = [];
   const httpServer = startHttpServer();
 
-  // Process each market
+  const activeMarkets = MARKETS.filter((market) => market.active);
+
+  // Start live watchers first so new trades are captured even while backfill runs.
   for (const market of MARKETS) {
     if (!market.active) {
       console.log(`Skipping: ${market.name} (inactive)`);
       continue;
     }
 
-    // Index historical events
-    if (CONFIG.indexHistorical) {
-      await indexHistoricalEvents(market);
-    }
-
-    // Watch for new swap events
     const unwatch = startEventWatcher(market);
     unwatchFns.push(unwatch);
-
-    // Initial snapshot and stats
-    await snapshotPrice(market);
-    await updateMarketStats(market);
-
-    console.log('');
   }
 
   // ── Start ClearingHouse notification watchers ─────────────────
   const chUnwatches = startClearingHouseWatchers();
   chUnwatches.forEach(fn => unwatchFns.push(fn));
 
+  if (CONFIG.indexHistorical) {
+    setTimeout(async () => {
+      for (const market of activeMarkets) {
+        await indexHistoricalEvents(market);
+        await sleep(CONFIG.rpcDelayMs);
+      }
+    }, 0);
+  }
+
+  if (CONFIG.initialSnapshots) {
+    setTimeout(() => snapshotActiveMarkets(), CONFIG.rpcDelayMs);
+  }
+
+  setTimeout(async () => {
+    for (const market of activeMarkets) {
+      await updateMarketStats(market);
+    }
+  }, CONFIG.rpcDelayMs);
+
   // Set up periodic tasks
   const snapshotTimer = setInterval(async () => {
     console.log('[SNAPSHOT] Taking price snapshots...');
-    for (const market of MARKETS) {
-      if (market.active) {
-        await snapshotPrice(market);
-      }
-    }
+    await snapshotActiveMarkets();
   }, CONFIG.snapshotInterval);
 
   const statsTimer = setInterval(async () => {
